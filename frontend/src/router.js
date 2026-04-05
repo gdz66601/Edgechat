@@ -3,6 +3,9 @@ import store from './store.js';
 import LoginPage from './pages/LoginPage.vue';
 import ChatPage from './pages/ChatPage.vue';
 import AdminPage from './pages/AdminPage.vue';
+import AdminUsersPage from './pages/AdminUsersPage.vue';
+import AdminMessagesPage from './pages/AdminMessagesPage.vue';
+import AdminSitePage from './pages/AdminSitePage.vue';
 import AdminRoomPage from './pages/AdminRoomPage.vue';
 import SettingsPage from './pages/SettingsPage.vue';
 
@@ -22,9 +25,32 @@ const router = createRouter({
     },
     {
       path: '/admin',
-      name: 'admin',
       component: AdminPage,
-      meta: { admin: true }
+      meta: { admin: true },
+      children: [
+        {
+          path: '',
+          redirect: { name: 'admin-users' }
+        },
+        {
+          path: 'users',
+          name: 'admin-users',
+          component: AdminUsersPage,
+          meta: { admin: true }
+        },
+        {
+          path: 'messages',
+          name: 'admin-messages',
+          component: AdminMessagesPage,
+          meta: { admin: true }
+        },
+        {
+          path: 'site',
+          name: 'admin-site',
+          component: AdminSitePage,
+          meta: { admin: true }
+        }
+      ]
     },
     {
       path: '/admin/rooms/:kind/:roomId',

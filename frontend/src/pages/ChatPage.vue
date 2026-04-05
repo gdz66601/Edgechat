@@ -30,6 +30,8 @@ const inviteSubmitting = ref(false);
 const messagesEl = ref(null);
 const fileInputEl = ref(null);
 const inviteUserId = ref('');
+const showQuickActions = ref(false);
+const quickActionMode = ref('');
 let roomSocket = null;
 
 const createGroupForm = reactive({
@@ -45,8 +47,6 @@ const activeRoomKey = computed(() =>
     ? `${activeRoom.value.kind}:${activeRoom.value.id}`
     : ''
 );
-const publicChannels = computed(() => channels.value.filter((channel) => channel.kind === 'public'));
-const privateChannels = computed(() => channels.value.filter((channel) => channel.kind === 'private'));
 const canManageActiveRoom = computed(
   () => activeRoom.value && activeRoom.value.kind !== 'dm' && activeRoom.value.canManage
 );
@@ -54,20 +54,73 @@ const availableInviteUsers = computed(() => {
   const memberIds = new Set(groupMembers.value.map((member) => Number(member.id)));
   return users.value.filter((user) => !memberIds.has(Number(user.id)));
 });
+const usersWithoutDm = computed(() => {
+  const dmUserIds = new Set(dms.value.map((item) => Number(item.otherUser.id)));
+  return users.value.filter((user) => !dmUserIds.has(Number(user.id)));
+});
+const conversationItems = computed(() => {
+  const dmItems = dms.value.map((dm) => ({
+    key: `dm:${dm.id}`,
+    id: dm.id,
+    kind: 'dm',
+    title: dm.otherUser.displayName,
+    subtitle: `联系人 @${dm.otherUser.username}`,
+    avatarUrl: dm.otherUser.avatarUrl,
+    fallback: dm.otherUser.displayName,
+    lastMessageAt: dm.lastMessageAt || '',
+    source: dm
+  }));
+
+  const channelItems = channels.value.map((channel) => ({
+    key: `${channel.kind}:${channel.id}`,
+    id: channel.id,
+    kind: channel.kind,
+    title: channel.name,
+    subtitle:
+      channel.kind === 'public' && !channel.isMember
+        ? `公开群组 · 点击加入`
+        : `群主 ${channel.ownerDisplayName || '未知'}`,
+    avatarUrl: '',
+    fallback: channel.kind === 'private' ? '群' : '聊',
+    lastMessageAt: channel.lastMessageAt || '',
+    source: channel
+  }));
+
+  return [...dmItems, ...channelItems].sort((left, right) => {
+    const leftTime = left.lastMessageAt ? new Date(left.lastMessageAt).getTime() : 0;
+    const rightTime = right.lastMessageAt ? new Date(right.lastMessageAt).getTime() : 0;
+    if (leftTime !== rightTime) {
+      return rightTime - leftTime;
+    }
+    return left.title.localeCompare(right.title, 'zh-CN');
+  });
+});
 
 const activeRoomSubtitle = computed(() => {
   if (!activeRoom.value) {
-    return '选择一个公开群组、私有群组或私信开始聊天。';
+    return '从左侧会话列表中选择联系人或群组开始聊天。';
   }
 
   if (activeRoom.value.kind === 'dm') {
-    return `与 @${activeRoom.value.otherUser?.username || activeRoom.value.name} 的一对一私信`;
+    return `与 @${activeRoom.value.otherUser?.username || activeRoom.value.name} 的私信`;
   }
 
   const visibility = activeRoom.value.kind === 'private' ? '私有群组' : '公开群组';
+  const owner = activeRoom.value.ownerDisplayName ? ` · 群主 ${activeRoom.value.ownerDisplayName}` : '';
   const memberCount = activeRoom.value.memberCount ? ` · ${activeRoom.value.memberCount} 位成员` : '';
-  return `${visibility}${memberCount}${activeRoom.value.canManage ? ' · 你是群主' : ''}`;
+  return `${visibility}${owner}${memberCount}`;
 });
+
+function formatTime(value) {
+  return new Date(value).toLocaleString();
+}
+
+function formatListTime(value) {
+  if (!value) {
+    return '';
+  }
+  return new Date(value).toLocaleDateString();
+}
 
 function roomLabel(room) {
   if (!room) {
@@ -78,11 +131,7 @@ function roomLabel(room) {
     return room.otherUser?.displayName || room.name;
   }
 
-  return `${room.kind === 'private' ? '[私有]' : '[公开]'} ${room.name}`;
-}
-
-function formatTime(value) {
-  return new Date(value).toLocaleString();
+  return room.name;
 }
 
 function isOwnMessage(message) {
@@ -116,6 +165,26 @@ function bubbleClass(message, index) {
   };
 }
 
+function resetQuickActions() {
+  showQuickActions.value = false;
+  quickActionMode.value = '';
+  createGroupForm.name = '';
+  createGroupForm.description = '';
+  createGroupForm.kind = 'public';
+  createGroupForm.memberUserIds = [];
+}
+
+function toggleQuickActions() {
+  showQuickActions.value = !showQuickActions.value;
+  if (!showQuickActions.value) {
+    quickActionMode.value = '';
+  }
+}
+
+function setQuickActionMode(mode) {
+  quickActionMode.value = quickActionMode.value === mode ? '' : mode;
+}
+
 async function refreshSidebar() {
   sidebarLoading.value = true;
   try {
@@ -138,6 +207,7 @@ function applyActiveChannel(channel) {
     kind: channel.kind,
     name: channel.name,
     description: channel.description,
+    ownerDisplayName: channel.ownerDisplayName || '',
     canManage: Boolean(channel.canManage),
     myRole: channel.myRole || '',
     memberCount: Number(channel.memberCount || 0)
@@ -163,10 +233,20 @@ async function selectDm(dm) {
   };
 }
 
+async function openConversation(item) {
+  if (item.kind === 'dm') {
+    await selectDm(item.source);
+    return;
+  }
+
+  await selectChannel(item.source);
+}
+
 async function openDmWithUser(user) {
   const payload = await api.openDm(user.id);
   await refreshSidebar();
   await selectDm(payload.dm);
+  resetQuickActions();
 }
 
 async function loadMessages(before = null, append = false) {
@@ -331,12 +411,9 @@ async function createGroup() {
   error.value = '';
   try {
     const payload = await api.createGroup(createGroupForm);
-    createGroupForm.name = '';
-    createGroupForm.description = '';
-    createGroupForm.kind = 'public';
-    createGroupForm.memberUserIds = [];
     await refreshSidebar();
     await selectChannel(payload.channel);
+    resetQuickActions();
   } catch (currentError) {
     error.value = currentError.message;
   } finally {
@@ -408,19 +485,10 @@ async function bootstrap() {
   error.value = '';
   try {
     await refreshSidebar();
-    const preferredRoom =
-      channels.value.find((channel) => channel.isMember) ||
-      dms.value[0] ||
-      publicChannels.value[0] ||
-      privateChannels.value[0] ||
-      null;
+    const preferredRoom = conversationItems.value[0] || null;
 
     if (preferredRoom) {
-      if (preferredRoom.kind === 'dm') {
-        await selectDm(preferredRoom);
-      } else {
-        await selectChannel(preferredRoom);
-      }
+      await openConversation(preferredRoom);
     }
   } catch (currentError) {
     error.value = currentError.message;
@@ -451,9 +519,8 @@ onBeforeUnmount(disconnectSocket);
 <template>
   <div class="page-shell chat-shell">
     <div class="chat-app">
-      <aside class="chat-sidebar">
-        <div class="chat-sidebar__header">
-          <UiBadge>CF Chat</UiBadge>
+      <aside class="chat-sidebar chat-sidebar--wechat">
+        <div class="chat-sidebar__topbar">
           <div class="chat-sidebar__identity">
             <UiAvatar
               :src="session?.avatarUrl"
@@ -464,97 +531,49 @@ onBeforeUnmount(disconnectSocket);
               <span>{{ session?.isAdmin ? '管理员账号' : '团队成员' }}</span>
             </div>
           </div>
+
+          <div class="chat-sidebar__toolbar">
+            <UiButton variant="ghost" size="icon" @click="toggleQuickActions">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path
+                  d="M12 5v14M5 12h14"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="1.8"
+                />
+              </svg>
+            </UiButton>
+          </div>
         </div>
 
-        <div class="chat-sidebar__body">
-          <UiSurface tone="soft">
-            <div class="chat-sidebar__section-title">
-              <span>公开群组</span>
-              <UiBadge variant="secondary">{{ publicChannels.length }}</UiBadge>
-            </div>
-            <div v-if="sidebarLoading" class="chat-sidebar__hint">正在同步群组...</div>
-            <div v-else class="chat-sidebar__list">
-              <button
-                v-for="channel in publicChannels"
-                :key="channel.id"
-                class="chat-room-item"
-                :class="{ 'chat-room-item--active': activeRoom?.kind === channel.kind && activeRoom?.id === channel.id }"
-                @click="selectChannel(channel)"
-              >
-                <strong>{{ channel.name }}</strong>
-                <span>{{ channel.isMember ? `${channel.memberCount} 位成员` : '点击加入' }}</span>
-              </button>
-            </div>
-          </UiSurface>
+        <UiSurface v-if="showQuickActions" tone="soft" class="chat-quick-actions">
+          <div class="chat-quick-actions__switch">
+            <UiButton
+              :variant="quickActionMode === 'group' ? 'default' : 'secondary'"
+              size="sm"
+              @click="setQuickActionMode('group')"
+            >
+              创建群组
+            </UiButton>
+            <UiButton
+              :variant="quickActionMode === 'dm' ? 'default' : 'secondary'"
+              size="sm"
+              @click="setQuickActionMode('dm')"
+            >
+              发起私信
+            </UiButton>
+          </div>
 
-          <UiSurface tone="soft">
-            <div class="chat-sidebar__section-title">
-              <span>私有群组</span>
-              <UiBadge variant="secondary">{{ privateChannels.length }}</UiBadge>
-            </div>
-            <div class="chat-sidebar__list">
-              <button
-                v-for="channel in privateChannels"
-                :key="channel.id"
-                class="chat-room-item"
-                :class="{ 'chat-room-item--active': activeRoom?.kind === channel.kind && activeRoom?.id === channel.id }"
-                @click="selectChannel(channel)"
-              >
-                <strong>{{ channel.name }}</strong>
-                <span>{{ channel.memberCount }} 位成员{{ channel.canManage ? ' · 群主' : '' }}</span>
-              </button>
-            </div>
-          </UiSurface>
-
-          <UiSurface tone="soft">
-            <div class="chat-sidebar__section-title">
-              <span>私信</span>
-              <UiBadge variant="secondary">{{ dms.length }}</UiBadge>
-            </div>
-            <div class="chat-sidebar__list">
-              <button
-                v-for="dm in dms"
-                :key="dm.id"
-                class="chat-room-item"
-                :class="{ 'chat-room-item--active': activeRoom?.kind === 'dm' && activeRoom?.id === dm.id }"
-                @click="selectDm(dm)"
-              >
-                <strong>{{ dm.otherUser.displayName }}</strong>
-                <span>@{{ dm.otherUser.username }}</span>
-              </button>
-            </div>
-          </UiSurface>
-
-          <UiSurface tone="soft">
-            <div class="chat-sidebar__section-title">
-              <span>发起私信</span>
-              <UiBadge variant="secondary">{{ users.length }}</UiBadge>
-            </div>
-            <div class="chat-sidebar__list">
-              <button
-                v-for="user in users"
-                :key="user.id"
-                class="chat-room-item chat-room-item--ghost"
-                @click="openDmWithUser(user)"
-              >
-                <strong>{{ user.displayName }}</strong>
-                <span>@{{ user.username }}</span>
-              </button>
-            </div>
-          </UiSurface>
-
-          <UiSurface tone="soft" class="chat-sidebar__create">
-            <div class="chat-sidebar__section-title">
-              <span>创建群组</span>
-              <UiBadge variant="secondary">{{ createGroupForm.kind === 'private' ? '私有' : '公开' }}</UiBadge>
-            </div>
+          <div v-if="quickActionMode === 'group'" class="chat-quick-actions__panel">
             <label class="field">
               <span>群组名称</span>
-              <input v-model.trim="createGroupForm.name" placeholder="例如：产品讨论组" />
+              <input v-model.trim="createGroupForm.name" placeholder="例如：设计讨论组" />
             </label>
             <label class="field">
               <span>描述</span>
-              <textarea v-model.trim="createGroupForm.description" placeholder="简单介绍这个群组的用途" />
+              <textarea v-model.trim="createGroupForm.description" placeholder="选填" />
             </label>
             <label class="field">
               <span>可见性</span>
@@ -562,9 +581,6 @@ onBeforeUnmount(disconnectSocket);
                 <option value="public">公开群组</option>
                 <option value="private">私有群组</option>
               </select>
-            </label>
-            <label class="field">
-              <span>初始成员</span>
             </label>
             <div class="member-picker-list">
               <label v-for="user in users" :key="`create-${user.id}`" class="member-picker-item">
@@ -574,27 +590,52 @@ onBeforeUnmount(disconnectSocket);
               </label>
             </div>
             <UiButton :disabled="groupSubmitting" block @click="createGroup">
-              {{ groupSubmitting ? '创建中...' : '创建群组' }}
+              {{ groupSubmitting ? '创建中...' : '确认创建' }}
             </UiButton>
-          </UiSurface>
+          </div>
+
+          <div v-if="quickActionMode === 'dm'" class="chat-quick-actions__panel">
+            <div v-if="!usersWithoutDm.length" class="chat-sidebar__hint">所有站内用户都已经有私信会话了。</div>
+            <div v-else class="chat-sidebar__list chat-sidebar__list--compact">
+              <button
+                v-for="user in usersWithoutDm"
+                :key="`quick-dm-${user.id}`"
+                class="chat-room-item chat-room-item--wechat"
+                @click="openDmWithUser(user)"
+              >
+                <strong>{{ user.displayName }}</strong>
+                <span>@{{ user.username }}</span>
+              </button>
+            </div>
+          </div>
+        </UiSurface>
+
+        <div class="chat-sidebar__conversation-list">
+          <div v-if="sidebarLoading" class="chat-sidebar__hint">正在同步会话列表...</div>
+          <button
+            v-for="item in conversationItems"
+            :key="item.key"
+            class="chat-list-item"
+            :class="{ 'chat-list-item--active': activeRoomKey === item.key }"
+            @click="openConversation(item)"
+          >
+            <UiAvatar :src="item.avatarUrl" :fallback="item.fallback" />
+            <div class="chat-list-item__body">
+              <div class="chat-list-item__head">
+                <strong>{{ item.title }}</strong>
+                <span>{{ formatListTime(item.lastMessageAt) }}</span>
+              </div>
+              <div class="chat-list-item__desc">{{ item.subtitle }}</div>
+            </div>
+          </button>
         </div>
 
-        <div class="chat-sidebar__footer">
-          <UiSurface tone="soft">
-            <div class="chat-settings-card">
-              <div>
-                <strong>个人设置</strong>
-                <p>账号、后台和退出入口都收在侧栏底部。</p>
-              </div>
-              <div class="chat-settings-card__actions">
-                <UiButton variant="secondary" @click="router.push('/settings')">设置</UiButton>
-                <UiButton v-if="session?.isAdmin" variant="secondary" @click="router.push('/admin')">
-                  后台
-                </UiButton>
-                <UiButton variant="ghost" @click="logout">退出</UiButton>
-              </div>
-            </div>
-          </UiSurface>
+        <div class="chat-sidebar__footer chat-sidebar__footer--simple">
+          <UiButton variant="ghost" size="sm" @click="router.push('/settings')">设置</UiButton>
+          <UiButton v-if="session?.isAdmin" variant="ghost" size="sm" @click="router.push('/admin')">
+            后台
+          </UiButton>
+          <UiButton variant="ghost" size="sm" @click="logout">退出</UiButton>
         </div>
       </aside>
 
@@ -609,10 +650,7 @@ onBeforeUnmount(disconnectSocket);
           </UiBadge>
         </header>
 
-        <section
-          v-if="activeRoom && activeRoom.kind !== 'dm'"
-          class="chat-room-manage-wrap"
-        >
+        <section v-if="activeRoom && activeRoom.kind !== 'dm'" class="chat-room-manage-wrap">
           <UiSurface tone="soft" class="chat-room-manage">
             <div class="chat-room-manage__header">
               <div>
@@ -621,12 +659,7 @@ onBeforeUnmount(disconnectSocket);
               </div>
               <div class="chat-room-manage__actions">
                 <UiBadge variant="secondary">{{ activeRoom.myRole || 'member' }}</UiBadge>
-                <UiButton
-                  v-if="canManageActiveRoom"
-                  variant="ghost"
-                  size="sm"
-                  @click="deleteGroup"
-                >
+                <UiButton v-if="canManageActiveRoom" variant="ghost" size="sm" @click="deleteGroup">
                   删除群组
                 </UiButton>
               </div>
@@ -680,13 +713,13 @@ onBeforeUnmount(disconnectSocket);
             </UiButton>
 
             <UiSurface v-if="!activeRoom" tone="muted" class="chat-empty">
-              先从左侧选择一个群组，或者发起私信。
+              从左侧会话列表中选择一个联系人或群组。
             </UiSurface>
             <UiSurface v-else-if="loading" tone="muted" class="chat-empty">
               正在加载消息...
             </UiSurface>
             <UiSurface v-else-if="!messages.length" tone="muted" class="chat-empty">
-              这里还没有消息，发第一条开始吧。
+              这里还没有消息，发送第一条开始吧。
             </UiSurface>
 
             <article

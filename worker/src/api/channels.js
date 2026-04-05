@@ -13,6 +13,7 @@ function mapChannelRow(row) {
     name: row.name,
     description: row.description,
     kind: row.kind,
+    ownerDisplayName: row.owner_display_name || '',
     isMember: Boolean(Number(row.is_member)),
     myRole: row.my_role || '',
     canManage: Boolean(Number(row.can_manage)),
@@ -60,6 +61,7 @@ export function registerChannelRoutes(app) {
          c.name,
          c.description,
          c.kind,
+         owner.display_name AS owner_display_name,
          EXISTS (
            SELECT 1 FROM channel_members cm
            WHERE cm.channel_id = c.id AND cm.user_id = ?
@@ -85,6 +87,7 @@ export function registerChannelRoutes(app) {
            WHERE m.channel_id = c.id AND m.deleted_at IS NULL
          ) AS last_message_at
        FROM channels c
+       LEFT JOIN users owner ON owner.id = c.created_by
        WHERE c.kind IN ('public', 'private')
          AND c.deleted_at IS NULL
          AND (
@@ -165,6 +168,7 @@ export function registerChannelRoutes(app) {
         name,
         description,
         kind,
+        ownerDisplayName: session.displayName,
         isMember: true,
         myRole: 'owner',
         canManage: true,
