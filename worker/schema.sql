@@ -1,0 +1,65 @@
+PRAGMA foreign_keys = ON;
+
+CREATE TABLE IF NOT EXISTS users (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  username TEXT NOT NULL UNIQUE,
+  display_name TEXT NOT NULL,
+  password_hash TEXT NOT NULL,
+  password_salt TEXT NOT NULL,
+  avatar_key TEXT,
+  is_disabled INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  deleted_at TEXT
+);
+
+CREATE TABLE IF NOT EXISTS channels (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL UNIQUE,
+  description TEXT NOT NULL DEFAULT '',
+  kind TEXT NOT NULL CHECK (kind IN ('public', 'private', 'dm')),
+  dm_key TEXT UNIQUE,
+  created_by INTEGER,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  deleted_at TEXT,
+  FOREIGN KEY (created_by) REFERENCES users(id)
+);
+
+CREATE TABLE IF NOT EXISTS channel_members (
+  channel_id INTEGER NOT NULL,
+  user_id INTEGER NOT NULL,
+  role TEXT NOT NULL DEFAULT 'member' CHECK (role IN ('owner', 'member')),
+  invited_by INTEGER,
+  joined_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (channel_id, user_id),
+  FOREIGN KEY (channel_id) REFERENCES channels(id),
+  FOREIGN KEY (user_id) REFERENCES users(id),
+  FOREIGN KEY (invited_by) REFERENCES users(id)
+);
+
+CREATE TABLE IF NOT EXISTS messages (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  channel_id INTEGER NOT NULL,
+  sender_id INTEGER NOT NULL,
+  content TEXT NOT NULL DEFAULT '',
+  attachment_key TEXT,
+  attachment_name TEXT,
+  attachment_type TEXT,
+  attachment_size INTEGER,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  deleted_at TEXT,
+  FOREIGN KEY (channel_id) REFERENCES channels(id),
+  FOREIGN KEY (sender_id) REFERENCES users(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_messages_channel_created
+  ON messages(channel_id, id DESC);
+
+CREATE INDEX IF NOT EXISTS idx_messages_sender_created
+  ON messages(sender_id, id DESC);
+
+CREATE INDEX IF NOT EXISTS idx_channels_kind
+  ON channels(kind, id DESC);
+
+CREATE INDEX IF NOT EXISTS idx_users_username
+  ON users(username);

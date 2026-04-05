@@ -1,0 +1,10 @@
+# Sensitive information
+cf key.txt
+
+# Project documentation (not for GitHub)
+项目文档.md
+
+# Dependencies
+node_modules/
+.wrangler/
+.DS_Store

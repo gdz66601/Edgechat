@@ -1,0 +1,24 @@
+{
+  "name": "cfchat",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev:frontend": "vite --config frontend/vite.config.js",
+    "build:frontend": "vite build --config frontend/vite.config.js",
+    "build": "npm run build:frontend",
+    "check": "npm run build",
+    "deploy": "npm run build && wrangler deploy",
+    "d1:apply": "wrangler d1 execute cfchat-db --file ./worker/schema.sql"
+  },
+  "dependencies": {
+    "hono": "^4.8.3",
+    "vue": "^3.5.13",
+    "vue-router": "^4.5.1"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^5.2.3",
+    "vite": "^6.3.5",
+    "wrangler": "^4.11.1"
+  }
+}
