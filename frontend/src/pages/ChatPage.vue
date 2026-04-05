@@ -40,6 +40,11 @@ const createGroupForm = reactive({
 });
 
 const session = computed(() => store.session);
+const activeRoomKey = computed(() =>
+  activeRoom.value?.kind && activeRoom.value?.id
+    ? `${activeRoom.value.kind}:${activeRoom.value.id}`
+    : ''
+);
 const publicChannels = computed(() => channels.value.filter((channel) => channel.kind === 'public'));
 const privateChannels = computed(() => channels.value.filter((channel) => channel.kind === 'private'));
 const canManageActiveRoom = computed(
@@ -195,12 +200,9 @@ async function loadMembers() {
   try {
     const payload = await api.getChannelMembers(activeRoom.value.id);
     groupMembers.value = payload.members;
-    activeRoom.value = {
-      ...activeRoom.value,
-      canManage: payload.room.canManage,
-      myRole: payload.room.myRole,
-      memberCount: payload.members.length
-    };
+    activeRoom.value.canManage = payload.room.canManage;
+    activeRoom.value.myRole = payload.room.myRole;
+    activeRoom.value.memberCount = payload.members.length;
   } catch (currentError) {
     error.value = currentError.message;
   } finally {
@@ -222,6 +224,7 @@ function connectSocket() {
   }
 
   disconnectSocket();
+  wsStatus.value = 'connecting';
   roomSocket = connectRoomSocket({
     kind: activeRoom.value.kind,
     roomId: activeRoom.value.id,
@@ -351,10 +354,7 @@ async function inviteMember() {
   try {
     const payload = await api.inviteChannelMembers(activeRoom.value.id, [Number(inviteUserId.value)]);
     groupMembers.value = payload.members;
-    activeRoom.value = {
-      ...activeRoom.value,
-      memberCount: payload.members.length
-    };
+    activeRoom.value.memberCount = payload.members.length;
     inviteUserId.value = '';
     await refreshSidebar();
   } catch (currentError) {
@@ -376,10 +376,7 @@ async function removeMember(member) {
   try {
     const payload = await api.removeChannelMember(activeRoom.value.id, member.id);
     groupMembers.value = payload.members;
-    activeRoom.value = {
-      ...activeRoom.value,
-      memberCount: payload.members.length
-    };
+    activeRoom.value.memberCount = payload.members.length;
     await refreshSidebar();
   } catch (currentError) {
     error.value = currentError.message;
@@ -437,18 +434,15 @@ async function logout() {
   router.push('/login');
 }
 
-watch(
-  () => [activeRoom.value?.kind, activeRoom.value?.id],
-  async ([kind, id]) => {
-    if (!kind || !id) {
-      return;
-    }
-
-    await loadMessages();
-    await loadMembers();
-    connectSocket();
+watch(activeRoomKey, async (roomKey) => {
+  if (!roomKey) {
+    return;
   }
-);
+
+  await loadMessages();
+  await loadMembers();
+  connectSocket();
+});
 
 onMounted(bootstrap);
 onBeforeUnmount(disconnectSocket);
