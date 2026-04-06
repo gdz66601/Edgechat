@@ -81,9 +81,15 @@ async function changePassword() {
         <section class="panel">
           <h3 class="panel-title">个人资料</h3>
           <div class="avatar-row">
-            <img v-if="session?.avatarUrl" :src="session.avatarUrl" class="avatar" alt="avatar" />
-            <div v-else class="avatar"></div>
-            <input type="file" @change="uploadAvatar" />
+            <img v-if="session?.avatarUrl" :src="session.avatarUrl" class="avatar avatar--profile" alt="avatar" />
+            <div v-else class="avatar avatar--profile"></div>
+            <div class="avatar-upload">
+              <input id="settings-avatar-upload" type="file" class="avatar-upload__input" @change="uploadAvatar" />
+              <label class="avatar-upload__button ui-button ui-button--secondary ui-button--sm" for="settings-avatar-upload">
+                更换头像
+              </label>
+              <span class="avatar-upload__note">支持图片文件，上传后会立即更新资料</span>
+            </div>
           </div>
 
           <label class="field">

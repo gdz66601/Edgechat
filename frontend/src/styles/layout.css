@@ -13,7 +13,7 @@
   border-radius: var(--radius-window);
   border: 1px solid rgba(255, 255, 255, 0.6);
   background:
-    linear-gradient(135deg, rgba(255, 251, 247, 0.38), rgba(255, 251, 247, 0.14)),
+    linear-gradient(135deg, rgba(247, 250, 253, 0.38), rgba(247, 250, 253, 0.14)),
     repeating-linear-gradient(
       135deg,
       rgba(255, 255, 255, 0.04) 0,
@@ -26,7 +26,7 @@
     var(--shadow-lg),
     0 0 0 1px rgba(255, 255, 255, 0.15),
     inset 0 1px 0 rgba(255, 255, 255, 0.5),
-    inset 0 -1px 2px rgba(112, 101, 86, 0.06);
+    inset 0 -1px 2px rgba(88, 107, 124, 0.06);
   backdrop-filter: var(--blur-lg);
   -webkit-backdrop-filter: var(--blur-lg);
   position: relative;
@@ -109,7 +109,7 @@
 }
 
 .window-controls__dot--warm {
-  background: rgba(211, 135, 59, 0.68);
+  background: rgba(90, 143, 203, 0.72);
 }
 
 .window-controls__dot--danger {

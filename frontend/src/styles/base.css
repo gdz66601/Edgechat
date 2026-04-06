@@ -24,11 +24,11 @@ body {
   position: relative;
   overflow-x: hidden;
   background:
-    radial-gradient(circle at 12% 8%, rgba(211, 135, 59, 0.22), transparent 32%),
-    radial-gradient(circle at 88% 16%, rgba(45, 156, 151, 0.2), transparent 34%),
-    radial-gradient(circle at 76% 88%, rgba(211, 135, 59, 0.14), transparent 30%),
+    radial-gradient(circle at 12% 8%, rgba(45, 156, 151, 0.2), transparent 32%),
+    radial-gradient(circle at 88% 16%, rgba(90, 143, 203, 0.2), transparent 34%),
+    radial-gradient(circle at 76% 88%, rgba(90, 143, 203, 0.14), transparent 30%),
     radial-gradient(circle at 28% 72%, rgba(45, 156, 151, 0.12), transparent 26%),
-    linear-gradient(180deg, #f8f2ea 0%, #f0ebe3 100%);
+    linear-gradient(180deg, #eef5f9 0%, #e6eef4 100%);
   color: var(--text);
   font-family: var(--font-sans);
 }
@@ -53,19 +53,19 @@ body::after {
   animation: float-orb-primary 22s cubic-bezier(0.37, 0, 0.63, 1) infinite alternate;
 }
 
-/* 暖色光团：左上 → 对角右下 */
+/* 青色光团：左上 → 对角右下 */
 body::before {
   top: -20vw;
   left: -10vw;
-  background: radial-gradient(circle, rgba(211, 135, 59, 0.35), rgba(211, 135, 59, 0.08) 70%, transparent);
+  background: radial-gradient(circle, rgba(45, 156, 151, 0.34), rgba(45, 156, 151, 0.08) 70%, transparent);
   animation-delay: -4s;
 }
 
-/* 冷色光团：右下 → 对角左上 */
+/* 蓝色光团：右下 → 对角左上 */
 body::after {
   right: -14vw;
   bottom: -18vw;
-  background: radial-gradient(circle, rgba(45, 156, 151, 0.30), rgba(45, 156, 151, 0.06) 70%, transparent);
+  background: radial-gradient(circle, rgba(90, 143, 203, 0.3), rgba(90, 143, 203, 0.06) 70%, transparent);
   animation-name: float-orb-secondary;
   animation-duration: 26s;
   animation-delay: -8s;

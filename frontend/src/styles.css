@@ -26,19 +26,19 @@
   --font-sans: "SF Pro Display", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
 
   /* 暖雾白基底 */
-  --bg: #f3eee7;
-  --bg-elevated: #fbf7f1;
+  --bg: #e6eef4;
+  --bg-elevated: #f3f8fb;
 
   /* 玻璃层级 */
-  --surface-0: rgba(255, 251, 247, 0.34);
-  --surface-1: rgba(255, 251, 247, 0.44);
-  --surface-2: rgba(255, 251, 247, 0.58);
-  --surface-3: rgba(255, 251, 247, 0.76);
-  --surface-solid: #fbf6ef;
+  --surface-0: rgba(247, 250, 253, 0.34);
+  --surface-1: rgba(247, 250, 253, 0.44);
+  --surface-2: rgba(247, 250, 253, 0.58);
+  --surface-3: rgba(247, 250, 253, 0.76);
+  --surface-solid: #f4f8fc;
 
   /* 线条 */
-  --line-soft: rgba(112, 101, 86, 0.12);
-  --line-strong: rgba(112, 101, 86, 0.2);
+  --line-soft: rgba(88, 107, 124, 0.12);
+  --line-strong: rgba(88, 107, 124, 0.2);
 
   /* 文字层级 */
   --text: #1f2521;
@@ -46,10 +46,12 @@
   --text-faint: rgba(31, 37, 33, 0.5);
 
   /* 点题色：暖金 + 冷青 */
-  --warm: #d3873b;
-  --warm-soft: rgba(211, 135, 59, 0.16);
+  --warm: #5a8fcb;
+  --warm-soft: rgba(90, 143, 203, 0.16);
   --cool: #2d9c97;
   --cool-soft: rgba(45, 156, 151, 0.16);
+  --sky: #78a8de;
+  --sky-soft: rgba(120, 168, 222, 0.14);
 
   /* 功能色 */
   --danger: #ad4b40;
