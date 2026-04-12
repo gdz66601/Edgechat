@@ -1,4 +1,5 @@
 const API_PREFIX = '/api';
+const AUTH_INVALID_EVENT = 'cfchat:auth-invalid';
 
 function buildHeaders(extra = {}) {
   const headers = { ...extra };
@@ -27,7 +28,20 @@ async function request(path, options = {}) {
     : await response.text();
 
   if (!response.ok) {
-    throw new Error(payload?.error || payload || '请求失败');
+    const message = payload?.error || payload || 'Request failed';
+    const error = new Error(message);
+    error.status = response.status;
+    error.payload = payload;
+
+    if (response.status === 401 && typeof window !== 'undefined') {
+      window.dispatchEvent(
+        new CustomEvent(AUTH_INVALID_EVENT, {
+          detail: { message }
+        })
+      );
+    }
+
+    throw error;
   }
 
   return payload;
@@ -234,3 +248,4 @@ export default {
     });
   }
 };
+

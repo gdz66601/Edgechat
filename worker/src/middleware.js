@@ -1,4 +1,5 @@
-import { getSession } from './auth.js';
+import { deleteSession, getSession } from './auth.js';
+import { isUserActiveById } from './db.js';
 import { errorResponse } from './utils.js';
 
 function extractToken(request) {
@@ -15,7 +16,13 @@ export async function authMiddleware(c, next) {
   const token = extractToken(c.req.raw);
   const session = await getSession(c.env, token);
   if (!session) {
-    return errorResponse('请先登录', 401);
+    return errorResponse('Please log in first', 401);
+  }
+
+  const isActive = await isUserActiveById(c.env.DB, session.userId);
+  if (!isActive) {
+    await deleteSession(c.env, session.token);
+    return errorResponse('Account is unavailable', 401);
   }
 
   c.set('session', session);
@@ -25,7 +32,7 @@ export async function authMiddleware(c, next) {
 export async function adminMiddleware(c, next) {
   const session = c.get('session');
   if (!session?.isAdmin) {
-    return errorResponse('需要管理员权限', 403);
+    return errorResponse('Admin access required', 403);
   }
 
   await next();

@@ -2,6 +2,12 @@ import { computed, nextTick, ref } from "vue";
 import api from "../api.js";
 import { connectRoomSocket } from "../ws.js";
 
+const AUTH_INVALID_EVENT = "cfchat:auth-invalid";
+const WS_CLOSE_UNAUTHORIZED = 4401;
+const WS_CLOSE_FORBIDDEN = 4403;
+const WS_REASON_UNAUTHORIZED = "session_invalid";
+const WS_REASON_FORBIDDEN = "room_forbidden";
+
 export function useChatRoom({
 	activeRoom,
 	channels,
@@ -31,6 +37,7 @@ export function useChatRoom({
 	const groupAvatarInputEl = ref(null);
 	const inviteUserId = ref("");
 	let roomSocket = null;
+	let expectSocketClose = false;
 
 	const availableInviteUsers = computed(() => {
 		const memberIds = new Set(
@@ -142,10 +149,57 @@ export function useChatRoom({
 		}
 	}
 
+	function emitAuthInvalid(message) {
+		if (typeof window !== "undefined") {
+			window.dispatchEvent(
+				new CustomEvent(AUTH_INVALID_EVENT, {
+					detail: { message },
+				}),
+			);
+		}
+	}
+
+	function handleRoomAccessRevoked() {
+		const room = activeRoom.value;
+		if (!room) {
+			return;
+		}
+
+		const roomName = room.name || "this private room";
+		error.value =
+			room.kind === "private"
+				? `You no longer have access to "${roomName}".`
+				: "You no longer have access to this room.";
+
+		disconnectSocket();
+		activeRoom.value = null;
+		messages.value = [];
+		groupMembers.value = [];
+		showGroupEditor.value = false;
+		returnToConversationList();
+		void refreshSidebar();
+	}
+
+	function handleSocketClose(event) {
+		const code = Number(event?.code || 0);
+		const reason = String(event?.reason || "");
+		if (code === WS_CLOSE_UNAUTHORIZED || reason === WS_REASON_UNAUTHORIZED) {
+			emitAuthInvalid("Your session is no longer valid. Please sign in again.");
+			return;
+		}
+
+		if (code === WS_CLOSE_FORBIDDEN || reason === WS_REASON_FORBIDDEN) {
+			handleRoomAccessRevoked();
+		}
+	}
+
 	function disconnectSocket() {
 		if (roomSocket) {
+			expectSocketClose = true;
 			roomSocket.close();
 			roomSocket = null;
+		} else {
+			expectSocketClose = false;
 		}
 		wsStatus.value = "closed";
 	}
@@ -157,10 +211,34 @@ export function useChatRoom({
 
 		disconnectSocket();
 		wsStatus.value = "connecting";
-		roomSocket = connectRoomSocket({
+		const socket = connectRoomSocket({
 			kind: activeRoom.value.kind,
 			roomId: activeRoom.value.id,
-			onStatus(status) {
+			onStatus(event) {
+				if (event?.socket && roomSocket && event.socket !== roomSocket) {
+					return;
+				}
+
+				const status = event?.status || "closed";
+				if (status === "open") {
+					expectSocketClose = false;
+					wsStatus.value = "open";
+					return;
+				}
+
+				if (status === "closed") {
+					if (event?.socket && event.socket === roomSocket) {
+						roomSocket = null;
+					}
+					wsStatus.value = "closed";
+					if (expectSocketClose) {
+						expectSocketClose = false;
+						return;
+					}
+					handleSocketClose(event);
+					return;
+				}
+
 				wsStatus.value = status;
 			},
 			onMessage(payload) {
@@ -176,11 +254,12 @@ export function useChatRoom({
 				}
 			},
 		});
+		roomSocket = socket;
 	}
 
 	async function sendMessage() {
 		if (!roomSocket || roomSocket.readyState !== WebSocket.OPEN) {
-			error.value = "实时连接尚未建立，请稍后重试。";
+			error.value = "Real-time connection is not ready. Please try again in a moment.";
 			return;
 		}
 
@@ -293,7 +372,7 @@ export function useChatRoom({
 			return;
 		}
 
-		if (!window.confirm(`确认将 ${member.displayName} 移出群组吗？`)) {
+		if (!window.confirm(`Remove ${member.displayName} from this group?`)) {
 			return;
 		}
 
@@ -315,7 +394,7 @@ export function useChatRoom({
 			return;
 		}
 
-		if (!window.confirm(`确认删除群组 ${activeRoom.value.name} 吗？`)) {
+		if (!window.confirm(`Delete group ${activeRoom.value.name}?`)) {
 			return;
 		}
 
@@ -358,7 +437,7 @@ export function useChatRoom({
 
 		const name = groupSettingsForm.name.trim();
 		if (!name) {
-			error.value = "请填写群组名称。";
+			error.value = "Please enter a group name.";
 			return;
 		}
 
@@ -436,3 +515,4 @@ export function useChatRoom({
 		saveGroupSettings,
 	};
 }
+

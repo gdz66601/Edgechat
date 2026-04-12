@@ -20,6 +20,22 @@ export async function getUserByUsername(db, username) {
   return results[0] || null;
 }
 
+export async function isUserActiveById(db, userId) {
+  const { results } = await db
+    .prepare(
+      `SELECT id
+       FROM users
+       WHERE id = ?
+         AND deleted_at IS NULL
+         AND is_disabled = 0
+       LIMIT 1`
+    )
+    .bind(Number(userId))
+    .all();
+
+  return Boolean(results[0]);
+}
+
 export async function getSiteSettings(db) {
   const { results } = await db
     .prepare(
@@ -221,7 +237,7 @@ export async function insertMessage(db, { channelId, senderId, content, attachme
   const cleanContent = String(content || '').trim();
 
   if (!cleanContent && !cleanAttachment) {
-    throw new Error('消息内容不能为空');
+    throw new Error('Message content cannot be empty');
   }
 
   const result = await db

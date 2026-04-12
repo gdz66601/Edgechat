@@ -4,15 +4,21 @@ export function connectRoomSocket({ kind, roomId, onMessage, onStatus }) {
   const socket = new WebSocket(api.getRoomWebSocketUrl(kind, roomId));
 
   socket.addEventListener('open', () => {
-    onStatus?.('open');
+    onStatus?.({ status: 'open', socket });
   });
 
-  socket.addEventListener('close', () => {
-    onStatus?.('closed');
+  socket.addEventListener('close', (event) => {
+    onStatus?.({
+      status: 'closed',
+      socket,
+      code: event.code,
+      reason: event.reason,
+      wasClean: event.wasClean
+    });
   });
 
   socket.addEventListener('error', () => {
-    onStatus?.('error');
+    onStatus?.({ status: 'error', socket });
   });
 
   socket.addEventListener('message', (event) => {

@@ -10,6 +10,8 @@ import AdminSitePage from './pages/AdminSitePage.vue';
 import AdminRoomPage from './pages/AdminRoomPage.vue';
 import SettingsPage from './pages/SettingsPage.vue';
 
+const AUTH_INVALID_EVENT = 'cfchat:auth-invalid';
+
 const router = createRouter({
   history: createWebHistory(),
   routes: [
@@ -74,6 +76,14 @@ const router = createRouter({
     }
   ]
 });
+
+if (typeof window !== 'undefined') {
+  window.addEventListener(AUTH_INVALID_EVENT, () => {
+    if (router.currentRoute.value.path !== '/login') {
+      void router.push('/login');
+    }
+  });
+}
 
 router.beforeEach(async (to) => {
   if (!store.ready) {

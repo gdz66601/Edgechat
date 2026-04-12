@@ -1,6 +1,8 @@
 import { reactive } from 'vue';
 import api from './api.js';
 
+const AUTH_INVALID_EVENT = 'cfchat:auth-invalid';
+
 const state = reactive({
   ready: false,
   token: localStorage.getItem('cfchat.token') || '',
@@ -10,6 +12,12 @@ const state = reactive({
     siteIconUrl: ''
   }
 });
+
+function clearAuthState() {
+  localStorage.removeItem('cfchat.token');
+  state.token = '';
+  state.session = null;
+}
 
 function applySiteMetadata(site) {
   const siteName = String(site?.siteName || 'Edgechat').trim() || 'Edgechat';
@@ -55,9 +63,7 @@ async function initialize() {
     const payload = await api.session();
     state.session = payload.session;
   } catch {
-    localStorage.removeItem('cfchat.token');
-    state.token = '';
-    state.session = null;
+    clearAuthState();
   } finally {
     state.ready = true;
   }
@@ -77,9 +83,7 @@ async function logout() {
       await api.logout();
     }
   } finally {
-    localStorage.removeItem('cfchat.token');
-    state.token = '';
-    state.session = null;
+    clearAuthState();
   }
 }
 
@@ -93,6 +97,12 @@ function setSite(site) {
     siteIconUrl: String(site?.siteIconUrl || '').trim()
   };
   applySiteMetadata(state.site);
+}
+
+if (typeof window !== 'undefined') {
+  window.addEventListener(AUTH_INVALID_EVENT, () => {
+    clearAuthState();
+  });
 }
 
 export default {
